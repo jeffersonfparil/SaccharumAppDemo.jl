@@ -1,0 +1,33 @@
+<div style="font-family: sans-serif; padding: 20px;">
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <h1>Sugarcane Genomics Dashboard</h1>
+    <div>
+      <a href="/logout">Logout</a>
+    </div>
+  </div>
+  
+  <div style="background: #f4f4f4; padding: 15px; margin-bottom: 20px;">
+    <h3>Researcher Tools</h3>
+    <form action="/search" method="GET">
+      <input type="text" name="q" placeholder="Search annotations (e.g. Sucrose)..." style="padding: 8px; width: 300px;">
+      <button type="submit" style="padding: 8px;">Search DB</button>
+    </form>
+  </div>
+
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr style="background: #eee; text-align: left;">
+      <th style="padding: 10px;">Locus Tag</th>
+      <th style="padding: 10px;">Chromosome</th>
+      <th style="padding: 10px;">Annotation</th>
+      <th style="padding: 10px;">Action</th>
+    </tr>
+    <% for_each(genes) do gene %>
+      <tr style="border-bottom: 1px solid #ddd;">
+        <td style="padding: 10px;">$(gene.locus_tag)</td>
+        <td style="padding: 10px;">$(gene.chromosome)</td>
+        <td style="padding: 10px;">$(gene.functional_annotation)</td>
+        <td style="padding: 10px;"><a href="#">Analyze Sequence</a></td>
+      </tr>
+    <% end %>
+  </table>
+</div>
