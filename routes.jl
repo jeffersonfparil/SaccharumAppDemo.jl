@@ -1,16 +1,13 @@
 using Genie.Router
-using Genie.Renderer
-using Genie.Responses
-using .GenesController, .AuthenticationController
-using .Users, .Genes
+using .AuthController
+using .DashboardController
 
-route("/") do
-  redirect(:dashboard)
-end
+route("/", AuthController.login_page, named=:login_page)
+route("/login", AuthController.login, method=POST)
+route("/logout", AuthController.logout)
 
-route("/login", AuthenticationController.show_login, named = :show_login)
-route("/login", AuthenticationController.login, method = POST)
-route("/logout", AuthenticationController.logout)
+route("/dashboard", DashboardController.index, named=:dashboard)
 
-route("/dashboard", GenesController.dashboard, named = :dashboard)
-route("/search", GenesController.search)
+route("/api/data", DashboardController.api_genome_data)
+route("/api/search", DashboardController.api_search)
+route("/api/export_csv", DashboardController.export_csv)

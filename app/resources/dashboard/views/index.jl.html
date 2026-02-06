@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sugarcane Genome</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>body { font-family: sans-serif; }</style>
+</head>
+<body class="bg-gray-100">
+
+<div class="flex flex-col h-screen">
+    <nav class="bg-green-800 text-white p-4 flex justify-between items-center shadow-md">
+        <div class="font-bold text-lg">🌱 Sugarcane Genome</div>
+        <div class="flex gap-4 items-center">
+            <div class="relative">
+                <input id="search" type="text" placeholder="Search..." class="px-2 py-1 rounded text-black w-64 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500">
+                <div id="searchRes" class="absolute bg-white text-black w-full shadow-lg hidden z-10 rounded-b mt-1 max-h-60 overflow-y-auto"></div>
+            </div>
+            <a href="/logout" class="text-sm hover:underline text-red-200">Logout</a>
+        </div>
+    </nav>
+
+    <div class="p-4 flex gap-4 bg-white border-b items-center shadow-sm z-0">
+        <label class="font-semibold text-gray-700">Chromosome:</label>
+        <select id="chrom" class="border p-1 rounded bg-gray-50">
+            <option>Chr1</option>
+            <option>Chr2</option>
+            <option>Chr3</option>
+        </select>
+        <button onclick="load()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-1 rounded shadow transition">Load Track</button>
+        <button onclick="dl()" class="ml-auto bg-gray-600 hover:bg-gray-700 text-white px-4 py-1 rounded shadow transition">Export CSV</button>
+    </div>
+
+    <div class="flex-grow p-4 flex flex-col gap-4 overflow-hidden">
+        <div id="plot" class="bg-white p-2 rounded shadow h-1/2 border border-gray-200"></div>
+        
+        <div class="bg-white p-2 rounded shadow h-1/2 flex flex-col border border-gray-200">
+            <h3 class="font-bold p-2 border-b text-gray-700">Region Details</h3>
+            <div class="overflow-auto flex-grow">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-100 sticky top-0 text-gray-600 uppercase text-xs">
+                        <tr>
+                            <th class="p-3">Name</th>
+                            <th class="p-3">Type</th>
+                            <th class="p-3">Pos</th>
+                            <th class="p-3">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbl" class="divide-y divide-gray-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentData = [];
+
+    async function load() {
+        const chrom = document.getElementById('chrom').value;
+        const layout = document.getElementById('plot').layout;
+        let s = 0;
+        let e = 100000000;
+        
+        if(layout && layout.xaxis && layout.xaxis.range) { 
+            s = Math.floor(layout.xaxis.range[0]); 
+            e = Math.floor(layout.xaxis.range[1]); 
+        }
+        
+        // Using string concatenation to avoid parser conflicts
+        const url = '/api/data?chrom=' + chrom + '&start=' + s + '&end=' + e;
+        
+        const res = await fetch(url);
+        const json = await res.json();
+        currentData = json.features;
+        draw(currentData, chrom);
+        tabulate(currentData);
+    }
+
+    function draw(data, chrom) {
+        const traces = {};
+        
+        data.forEach(d => {
+            if(!traces[d.type]) {
+                traces[d.type] = {
+                    x: [], y: [], text: [], 
+                    mode: 'markers', 
+                    name: d.type, 
+                    type: 'scatter',
+                    marker: { size: 6 }
+                };
+            }
+            traces[d.type].x.push(d.pos);
+            traces[d.type].y.push(d.val);
+            traces[d.type].text.push(d.name);
+        });
+        
+        const plotData = Object.values(traces);
+        const layout = { 
+            title: 'Genome Browser: ' + chrom, 
+            dragmode: 'zoom', 
+            xaxis: {title: 'Position (bp)'}, 
+            yaxis: {title: 'Value'},
+            hovermode: 'closest' 
+        };
+        
+        Plotly.react('plot', plotData, layout);
+        
+        document.getElementById('plot').on('plotly_relayout', function(e) {
+            if(e['xaxis.range[0]']) {
+                const s = e['xaxis.range[0]'];
+                const end = e['xaxis.range[1]'];
+                const visible = currentData.filter(d => d.pos >= s && d.pos <= end);
+                tabulate(visible);
+            } else if (e['xaxis.autorange']) {
+                tabulate(currentData);
+            }
+        });
+    }
+
+    function tabulate(data) {
+        const rows = data.slice(0, 200).map(d => {
+            return '<tr class="hover:bg-green-50 transition">' + 
+                   '<td class="p-3 font-mono text-green-700">' + d.name + '</td>' +
+                   '<td class="p-3">' + d.type + '</td>' +
+                   '<td class="p-3 text-gray-600">' + d.pos + '</td>' +
+                   '<td class="p-3 font-bold">' + d.val.toFixed(3) + '</td>' +
+                   '</tr>';
+        }).join('');
+        
+        document.getElementById('tbl').innerHTML = rows;
+    }
+
+    function dl() { 
+        const chrom = document.getElementById('chrom').value;
+        window.location.href = '/api/export_csv?chrom=' + chrom; 
+    }
+
+    document.getElementById('search').addEventListener('input', async (e) => {
+        const q = e.target.value;
+        const div = document.getElementById('searchRes');
+        
+        if(q.length < 2) { 
+            div.classList.add('hidden'); 
+            return; 
+        }
+        
+        const res = await fetch('/api/search?q=' + q);
+        const data = await res.json();
+        
+        const html = data.map(d => {
+            return '<div class="p-2 hover:bg-green-100 cursor-pointer border-b" onclick="jump(\'' + d.chrom + '\', ' + d.pos + ')">' + 
+                   '<strong>' + d.name + '</strong> <span class="text-xs text-gray-500">(' + d.chrom + ')</span>' + 
+                   '</div>';
+        }).join('');
+        
+        div.innerHTML = html;
+        div.classList.remove('hidden');
+    });
+
+    function jump(chrom, pos) {
+        document.getElementById('chrom').value = chrom;
+        load().then(() => { 
+            Plotly.relayout('plot', {'xaxis.range': [pos-50000, pos+50000]}); 
+        });
+        document.getElementById('searchRes').classList.add('hidden');
+        document.getElementById('search').value = '';
+    }
+
+    load();
+</script>
+
+</body>
+</html>

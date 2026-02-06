@@ -1,9 +1,5 @@
-env: development
+env: DEV
 
-development:
-  adapter: SearchLightSQLite
+DEV:
+  adapter: SQLite
   database: db/sugarcane.sqlite
-
-production:
-  adapter: SearchLightSQLite # Switch to PostgreSQL for real deployment
-  database: db/sugarcane_prod.sqlite

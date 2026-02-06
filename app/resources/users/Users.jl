@@ -1,27 +1,26 @@
 module Users
-
-using SearchLight, SearchLight.Validation, GenieAuthentication
-
+using SearchLight, MbedTLS, Dates
 export User
 
 mutable struct User <: AbstractModel
-  id::DbId
-  username::String
-  password::String
-  name::String
-  role::String
-  email::String
+    id::DbId
+    username::String
+    password_hash::String
+    email::String
 end
 
-User(; id=DbId(), username="", password="", name="", role="student", email="") = 
-  User(id, username, password, name, role, email)
+User() = User(DbId(), "", "", "")
+SearchLight.table(::Type{User}) = "users"
 
-function SearchLight.Validation.validator(u::User)
-  ValidationResult([
-    ValidationRule(:username, User, presence=true),
-    ValidationRule(:password, User, presence=true),
-    ValidationRule(:role, User, in=["admin", "student"])
-  ])
+function hash_password(password::String)
+    return "hashed:" * bytes2hex(digest(MD_SHA256, password, "SugarSalt"))
 end
 
+function authenticate(username, password)
+    u = findone(User, username = username)
+    if isnothing(u)
+        return nothing
+    end
+    return (u.password_hash == hash_password(password)) ? u : nothing
+end
 end

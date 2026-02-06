@@ -2,28 +2,28 @@
 Sugarcane Genomics App Demo using Genie.jl
 
 
-Demo:
-
 ```julia
 using Pkg
-Pkg.instantiate()  # Downloads Genie, SearchLight, etc.
+using Dates
+using UUIDs
 
-# Initialize DB (One time only)
-include("bootstrap.jl") # This loads the app
+# --- Helper to write files ---
+function write_file(path, content)
+    mkpath(dirname(path))
+    open(path, "w") do io
+        write(io, content)
+    end
+    println("Created: \$path")
+end
 
-# Run Migrations to create tables
-include("db/migrations/setup_schema.jl")
-setup()
-# setdown()
 
-# Create a Dummy Admin User (Fellow) and Gene
-using .Users, .Genes, SearchLight
-u = User(username="admin", password="password", name="Dr. Fellow", role="admin", email="fellow@uq.edu.au")
-save(u)
+Pkg.add(["Genie", "GenieSession", "SearchLight", "SearchLightSQLite", "SQLite", "DataFrames", "CSV", "JSON", "MbedTLS", "Dates", "Logging", ])
 
-g = Gene(locus_tag="SC_001", chromosome="1A", functional_annotation="Sucrose Synthase", sequence_data="ATGC...")
-save(g)
 
-# Start Server
-Genie.up(8000, async=false)
+
+
+
+
+
+
 ```
