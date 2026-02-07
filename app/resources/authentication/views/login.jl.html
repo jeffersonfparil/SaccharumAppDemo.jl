@@ -1,4 +1,4 @@
-<div class="flex h-screen justify-center items-center">
+<!-- <div class="flex h-screen justify-center items-center">
     <div class="bg-white p-8 rounded shadow w-96">
         <h2 class="text-2xl font-bold mb-4 text-green-700">Sugarcane DB</h2>
         <form action="/login" method="POST">
@@ -8,4 +8,14 @@
         </form>
         <div class="mt-4 text-sm text-gray-500 text-center">Use: admin / admin123</div>
     </div>
+</div> -->
+
+<div style="max-width: 400px; margin: 50px auto; font-family: sans-serif;">
+  <h2>QAAFI Sugarcane Portal</h2>
+  <p>Please log in to access genomic data.</p>
+  <form action="/login" method="POST">
+    <input type="text" name="username" placeholder="Username" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 10px;">
+    <input type="password" name="password" placeholder="Password" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 10px;">
+    <button type="submit" style="width: 100%; box-sizing: border-box; padding: 10px; background-color: #007bff; color: white; border: none;">Login</button>
+  </form>
 </div>

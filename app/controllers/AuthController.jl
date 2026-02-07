@@ -38,7 +38,7 @@ end
 
 function logout()
     headers = [
-        "Location" => "/login", 
+        "Location" => "/", 
         "Set-Cookie" => "session_token=deleted; Path=/; Max-Age=0"
     ]
     return HTTP.Response(302, headers, "Logging out...")

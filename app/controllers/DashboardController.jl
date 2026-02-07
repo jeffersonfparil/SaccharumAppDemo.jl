@@ -1,239 +1,275 @@
 module DashboardController
-using Genie
-using Genie.Renderer
-using Genie.Renderer.Html
-using Genie.Renderer.Json
-using Genie.Requests
-using Genie.Router
-using SearchLight
-using DataFrames
-using CSV
-using ..App.Genomics
-using ..App.SimpleSession
 
-# --- HELPER: RAW HTML STRING ---
+using Genie, Genie.Renderer, Genie.Renderer.Html, Genie.Renderer.Json
+using Genie.Requests, Genie.Router, SearchLight, DataFrames, CSV, HTTP
+using ..App.Genomics, ..App.SimpleSession
+
+# --- RENDERER ---
 function get_dashboard_html()
     return """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Sugarcane Genome</title>
+    <title>Genomic Breeding Portal | QAAFI Sugarcane</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <style>body { font-family: sans-serif; }</style>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .uq-purple { background-color: #51247a; }
+        .loader { border-top-color: #51247a; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-50 flex flex-col h-screen">
 
-<div class="flex flex-col h-screen">
-    <nav class="bg-green-800 text-white p-4 flex justify-between items-center shadow-md">
-        <div class="font-bold text-lg">🌱 Sugarcane Genome</div>
-        <div class="flex gap-4 items-center">
-            <div class="relative">
-                <input id="search" type="text" placeholder="Search..." class="px-2 py-1 rounded text-black w-64 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500">
-                <div id="searchRes" class="absolute bg-white text-black w-full shadow-lg hidden z-10 rounded-b mt-1 max-h-60 overflow-y-auto"></div>
+    <header class="uq-purple text-white p-3 shadow-lg flex-none">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <div class="border-r border-purple-400 pr-4">
+                    <h1 class="text-xl font-bold">QAAFI</h1>
+                    <p class="text-xs uppercase tracking-tighter text-purple-200">Centre for Crop Science</p>
+                </div>
+                <h2 class="text-lg font-medium">Sugarcane Genetics Portal</h2>
             </div>
-            <a href="/logout" class="text-sm hover:underline text-red-200">Logout</a>
+            <div class="flex items-center gap-4">
+                <div id="loading" class="hidden flex items-center gap-2 bg-white text-purple-800 px-3 py-1 rounded text-xs font-bold">
+                    <div class="loader ease-linear rounded-full border-2 border-t-2 border-gray-200 h-4 w-4"></div>
+                    Loading...
+                </div>
+                <a href="/logout" class="bg-purple-600 hover:bg-red-600 px-4 py-2 rounded text-sm transition font-bold border border-purple-500">Sign Out</a>
+            </div>
         </div>
-    </nav>
+    </header>
 
-    <div class="p-4 flex gap-4 bg-white border-b items-center shadow-sm z-0">
-        <label class="font-semibold text-gray-700">Chromosome:</label>
-        <select id="chrom" class="border p-1 rounded bg-gray-50">
-            <option>Chr1</option>
-            <option>Chr2</option>
-            <option>Chr3</option>
-        </select>
-        <button onclick="load()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-1 rounded shadow transition">Refresh Data</button>
-        <button onclick="dl()" class="ml-auto bg-gray-600 hover:bg-gray-700 text-white px-4 py-1 rounded shadow transition">Export CSV</button>
+    <div class="bg-white border-b p-4 shadow-sm flex-none z-20">
+        <div class="container mx-auto flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-4">
+                <div class="flex flex-col">
+                    <label class="text-xs font-bold text-gray-400 uppercase">Chromosome</label>
+                    <select id="chrom" onchange="load()" class="border-2 border-gray-200 rounded p-2 text-sm font-bold text-gray-700 focus:border-purple-500 outline-none">
+                        <option value="Chr1">Chr1 (S. officinarum)</option>
+                        <option value="Chr2">Chr2 (S. officinarum)</option>
+                        <option value="Chr3">Chr3 (S. officinarum)</option>
+                    </select>
+                </div>
+                <button onclick="load()" class="mt-4 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-bold shadow transition transform active:scale-95">
+                    Refresh Track
+                </button>
+            </div>
+            
+            <div class="relative w-96">
+                <label class="text-xs font-bold text-gray-400 uppercase">Search Markers</label>
+                <input id="search" type="text" placeholder="e.g. SNP_100, GWAS..." class="w-full border-2 border-gray-200 rounded p-2 text-sm focus:border-purple-500 outline-none transition">
+                <div id="searchRes" class="absolute bg-white w-full shadow-2xl hidden z-50 border mt-1 max-h-64 overflow-y-auto rounded-b"></div>
+            </div>
+            
+            <button onclick="dl()" class="mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 border px-4 py-2 rounded text-sm font-bold flex items-center gap-2">
+                <span>📥</span> Export CSV
+            </button>
+        </div>
     </div>
 
-    <div class="flex-grow p-4 flex flex-col gap-4 overflow-hidden">
-        <div id="plot" class="bg-white p-2 rounded shadow h-1/2 border border-gray-200"></div>
+    <main class="flex-grow p-4 overflow-hidden flex flex-col gap-4 relative">
         
-        <div class="bg-white p-2 rounded shadow h-1/2 flex flex-col border border-gray-200">
-            <h3 class="font-bold p-2 border-b text-gray-700">Region Details <span id="count" class="text-xs text-gray-500 font-normal"></span></h3>
+        <section class="bg-white rounded-xl shadow-sm border flex-grow h-1/2 relative p-2">
+            <div id="plot" class="w-full h-full"></div>
+            <div id="empty-state" class="hidden absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10">
+                <div class="text-center">
+                    <h3 class="text-xl font-bold text-gray-400">No Data Found</h3>
+                    <p class="text-gray-400">Try selecting a different region or chromosome.</p>
+                </div>
+            </div>
+        </section>
+        
+        <section class="bg-white rounded-xl shadow-sm border flex-grow h-1/2 flex flex-col overflow-hidden">
+            <div class="p-3 border-b bg-gray-50 flex justify-between items-center flex-none">
+                <h3 class="font-bold text-gray-700 text-sm uppercase">Feature Table</h3>
+                <span id="count" class="text-xs font-mono bg-purple-100 text-purple-700 px-2 py-1 rounded">0 records</span>
+            </div>
             <div class="overflow-auto flex-grow">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-gray-100 sticky top-0 text-gray-600 uppercase text-xs">
-                        <tr><th class="p-3">Name</th><th class="p-3">Type</th><th class="p-3">Pos</th><th class="p-3">Value</th></tr>
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-100 sticky top-0 text-xs uppercase text-gray-500 font-bold">
+                        <tr>
+                            <th class="p-3 border-b">Name</th>
+                            <th class="p-3 border-b">Type</th>
+                            <th class="p-3 border-b">Position (bp)</th>
+                            <th class="p-3 border-b">Value (-log10 p)</th>
+                        </tr>
                     </thead>
-                    <tbody id="tbl" class="divide-y divide-gray-100"></tbody>
+                    <tbody id="tbl" class="text-sm divide-y divide-gray-100"></tbody>
                 </table>
             </div>
-        </div>
-    </div>
-</div>
+        </section>
+    </main>
 
-<script>
-    let currentData = [];
+    <script>
+        let currentData = [];
 
-    async function load() {
-        console.log("Loading data...");
-        const chrom = document.getElementById('chrom').value;
-        const layout = document.getElementById('plot').layout;
-        let s = 0;
-        let e = 100000000;
-        
-        if(layout && layout.xaxis && layout.xaxis.range) { 
-            s = Math.floor(layout.xaxis.range[0]); 
-            e = Math.floor(layout.xaxis.range[1]); 
-        }
-        
-        const url = '/api/data?chrom=' + chrom + '&start=' + s + '&end=' + e;
-        
-        try {
-            const res = await fetch(url);
-            if (!res.ok) {
-                if (res.status === 401) {
-                    alert("Session expired. Please log in again.");
-                    window.location.href = "/login";
-                    return;
-                }
-                throw new Error("API Error: " + res.status);
+        async function load() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('empty-state').classList.add('hidden');
+            
+            const chrom = document.getElementById('chrom').value;
+            const layout = document.getElementById('plot').layout;
+            let s = 0; 
+            let e = 100000000;
+            
+            if(layout && layout.xaxis && layout.xaxis.range) { 
+                s = Math.floor(layout.xaxis.range[0]); 
+                e = Math.floor(layout.xaxis.range[1]); 
             }
             
-            const json = await res.json();
+            const url = '/api/data?chrom=' + chrom + '&start=' + s + '&end=' + e;
+            console.log("Fetching: " + url);
             
-            if (!json.features) {
-                console.error("Invalid JSON:", json);
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error("API Failed");
+                
+                const json = await res.json();
+                currentData = json.features;
+                
+                console.log("Loaded " + currentData.length + " items");
+                
+                document.getElementById('count').innerText = currentData.length + ' records';
+                
+                if (currentData.length === 0) {
+                    document.getElementById('empty-state').classList.remove('hidden');
+                }
+                
+                draw(currentData, chrom);
+                tabulate(currentData);
+                
+            } catch (err) { 
+                console.error(err);
+                alert("Error loading data. Check console.");
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function draw(data, chrom) {
+            const traces = {};
+            
+            data.forEach(d => {
+                if(!traces[d.type]) {
+                    traces[d.type] = { 
+                        x:[], y:[], text:[], 
+                        mode:'markers', 
+                        name:d.type, 
+                        type:'scatter',
+                        marker: { size: 8, opacity: 0.7 }
+                    };
+                }
+                traces[d.type].x.push(d.pos); 
+                traces[d.type].y.push(d.val); 
+                traces[d.type].text.push(d.name);
+            });
+            
+            const layout = { 
+                title: false,
+                xaxis: { title: 'Physical Position (bp)', gridcolor: '#f3f4f6' },
+                yaxis: { title: 'Signal Intensity', gridcolor: '#f3f4f6' },
+                margin: { t:20, b:40, l:60, r:20 },
+                hovermode: 'closest',
+                plot_bgcolor: 'white'
+            };
+            
+            Plotly.react('plot', Object.values(traces), layout);
+            
+            document.getElementById('plot').on('plotly_relayout', function(ev) {
+                if(ev['xaxis.range[0]']) {
+                    const s = ev['xaxis.range[0]'];
+                    const end = ev['xaxis.range[1]'];
+                    const sub = currentData.filter(d => d.pos >= s && d.pos <= end);
+                    tabulate(sub);
+                } else if (ev['xaxis.autorange']) {
+                    tabulate(currentData);
+                }
+            });
+        }
+
+        function tabulate(data) {
+            const el = document.getElementById('tbl');
+            if (data.length === 0) {
+                el.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-400">No data in this view</td></tr>';
                 return;
             }
-
-            currentData = json.features;
-            console.log("Loaded features:", currentData.length);
-            document.getElementById('count').innerText = '(' + currentData.length + ' records)';
-            
-            draw(currentData, chrom);
-            tabulate(currentData);
-            
-        } catch (err) {
-            console.error(err);
-            alert("Failed to load data: " + err.message);
+            el.innerHTML = data.slice(0, 100).map(d => {
+                return '<tr class="hover:bg-purple-50 transition border-b border-gray-50">' + 
+                       '<td class="p-3 font-mono font-bold text-purple-700">' + d.name + '</td>' +
+                       '<td class="p-3"><span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold uppercase">' + d.type + '</span></td>' +
+                       '<td class="p-3 text-gray-600">' + d.pos.toLocaleString() + '</td>' +
+                       '<td class="p-3 font-medium">' + d.val.toFixed(4) + '</td>' +
+                       '</tr>';
+            }).join('');
         }
-    }
 
-    function draw(data, chrom) {
-        const traces = {};
-        
-        if (data.length === 0) {
-            Plotly.react('plot', [], { 
-                title: 'No Data for ' + chrom, 
-                xaxis: {title: 'Position (bp)', range: [0, 100000000]}, 
-                yaxis: {title: 'Value'}
+        const searchInput = document.getElementById('search');
+        const searchRes = document.getElementById('searchRes');
+        let debounceTimer;
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            const q = e.target.value;
+            
+            if(q.length < 2) { 
+                searchRes.classList.add('hidden'); 
+                return; 
+            }
+            
+            debounceTimer = setTimeout(async () => {
+                try {
+                    console.log("Searching for: " + q);
+                    const res = await fetch('/api/search?q=' + q);
+                    const results = await res.json();
+                    
+                    if(results.length === 0) {
+                         searchRes.innerHTML = '<div class="p-3 text-sm text-gray-400">No matches found</div>';
+                    } else {
+                        searchRes.innerHTML = results.slice(0, 15).map(d => 
+                            '<div class="p-3 hover:bg-purple-50 cursor-pointer text-sm border-b flex justify-between group" onclick="jump(\\'' + d.chrom + '\\',' + d.pos + ')">' + 
+                            '<span class="font-bold text-gray-800 group-hover:text-purple-700">' + d.name + '</span>' + 
+                            '<span class="text-xs text-gray-400">' + d.chrom + ' : ' + d.pos + '</span>' +
+                            '</div>'
+                        ).join('');
+                    }
+                    searchRes.classList.remove('hidden');
+                } catch(err) { console.error(err); }
+            }, 300);
+        });
+
+        function jump(c, p) {
+            document.getElementById('chrom').value = c;
+            load().then(() => { 
+                Plotly.relayout('plot', {'xaxis.range': [p-50000, p+50000]}); 
             });
-            return;
+            searchRes.classList.add('hidden');
+            searchInput.value = '';
         }
 
-        data.forEach(d => {
-            if(!traces[d.type]) {
-                traces[d.type] = {
-                    x: [], y: [], text: [], 
-                    mode: 'markers', 
-                    name: d.type, 
-                    type: 'scatter',
-                    marker: { size: 6 }
-                };
-            }
-            traces[d.type].x.push(d.pos);
-            traces[d.type].y.push(d.val);
-            traces[d.type].text.push(d.name);
-        });
-        
-        const plotData = Object.values(traces);
-        const layout = { 
-            title: 'Genome Browser: ' + chrom, 
-            dragmode: 'zoom', 
-            xaxis: {title: 'Position (bp)'}, 
-            yaxis: {title: 'Value'},
-            hovermode: 'closest' 
-        };
-        
-        Plotly.react('plot', plotData, layout);
-        
-        document.getElementById('plot').on('plotly_relayout', function(e) {
-            if(e['xaxis.range[0]']) {
-                const s = e['xaxis.range[0]'];
-                const end = e['xaxis.range[1]'];
-                const visible = currentData.filter(d => d.pos >= s && d.pos <= end);
-                tabulate(visible);
-            } else if (e['xaxis.autorange']) {
-                tabulate(currentData);
-            }
-        });
-    }
-
-    function tabulate(data) {
-        const rows = data.slice(0, 200).map(d => {
-            return '<tr class="hover:bg-green-50 transition">' + 
-                   '<td class="p-3 font-mono text-green-700">' + d.name + '</td>' +
-                   '<td class="p-3">' + d.type + '</td>' +
-                   '<td class="p-3 text-gray-600">' + d.pos + '</td>' +
-                   '<td class="p-3 font-bold">' + d.val.toFixed(3) + '</td>' +
-                   '</tr>';
-        }).join('');
-        
-        document.getElementById('tbl').innerHTML = rows;
-    }
-
-    function dl() { 
-        const chrom = document.getElementById('chrom').value;
-        window.location.href = '/api/export_csv?chrom=' + chrom; 
-    }
-
-    document.getElementById('search').addEventListener('input', async (e) => {
-        const q = e.target.value;
-        const div = document.getElementById('searchRes');
-        
-        if(q.length < 2) { 
-            div.classList.add('hidden'); 
-            return; 
+        function dl() { 
+            const chrom = document.getElementById('chrom').value;
+            window.location.href = '/api/export_csv?chrom=' + chrom; 
         }
-        
-        const res = await fetch('/api/search?q=' + q);
-        const data = await res.json();
-        
-        const html = data.map(d => {
-            return '<div class="p-2 hover:bg-green-100 cursor-pointer border-b" onclick="jump(\'' + d.chrom + '\', ' + d.pos + ')">' + 
-                   '<strong>' + d.name + '</strong> <span class="text-xs text-gray-500">(' + d.chrom + ')</span>' + 
-                   '</div>';
-        }).join('');
-        
-        div.innerHTML = html;
-        div.classList.remove('hidden');
-    });
 
-    function jump(chrom, pos) {
-        document.getElementById('chrom').value = chrom;
-        load().then(() => { 
-            Plotly.relayout('plot', {'xaxis.range': [pos-50000, pos+50000]}); 
-        });
-        document.getElementById('searchRes').classList.add('hidden');
-        document.getElementById('search').value = '';
-    }
-
-    load();
-</script>
-
+        load();
+    </script>
 </body>
 </html>
-    """
+"""
 end
 
-# --- CONTROLLER LOGIC ---
+# --- SESSION & API LOGIC ---
 
 function get_session_token()
-    if !haskey(Genie.Router.params(), :REQUEST)
-        return nothing
-    end
+    if !haskey(Genie.Router.params(), :REQUEST) return nothing end
     req = Genie.Router.params(:REQUEST)
     cookie_str = ""
     if hasproperty(req, :headers)
         for (k, v) in req.headers
-            if lowercase(string(k)) == "cookie"
-                cookie_str = v
-                break
-            end
+            if lowercase(string(k)) == "cookie" cookie_str = v; break end
         end
     end
     if isempty(cookie_str) return nothing end
@@ -243,53 +279,57 @@ end
 
 function check_auth()
     token = get_session_token()
-    if isnothing(token) return false end
-    uid = SimpleSession.get_user(token)
-    return !isnothing(uid)
+    isnothing(token) && return false
+    return !isnothing(SimpleSession.get_user(token))
 end
 
 function index()
-    if !check_auth() 
-        return redirect(:login_page) 
-    end
-    return get_dashboard_html()
+    check_auth() ? get_dashboard_html() : redirect(:login_page)
 end
 
 function api_genome_data()
-    # Debug Logging
-    println("API Call: Get Data")
-    if !check_auth() 
-        println("API: Unauthorized")
-        return Genie.Renderer.Json.json(Dict("error" => "Unauthorized"), status=401) 
-    end
+    !check_auth() && return json(Dict("error" => "Unauthorized"), status=401)
     
-    start_pos = parse(Int, get(params(), :start, "0"))
-    end_pos = parse(Int, get(params(), :end, "1000000000"))
     chrom = get(params(), :chrom, "Chr1")
+    s_pos = parse(Int, get(params(), :start, "0"))
+    e_pos = parse(Int, get(params(), :end, "1000000000"))
     
-    # FIX: Used correct variable names start_pos and end_pos
-    println("API: Querying $chrom ($start_pos - $end_pos)")
+    features = find(GenomicFeature, SQLWhereExpression("chromosome = ? AND position >= ? AND position <= ?", chrom, s_pos, e_pos))
     
-    features = find(GenomicFeature, SQLWhereExpression("chromosome = ? AND position >= ? AND position <= ?", chrom, start_pos, end_pos))
-    println("API: Found $(length(features)) features")
-    
-    return Genie.Renderer.Json.json(Dict("features" => [Dict("id"=>f.id, "pos"=>f.position, "val"=>f.value, "type"=>f.feature_type, "name"=>f.name) for f in features]))
+    return json(Dict("features" => [Dict("id"=>f.id, "pos"=>f.position, "val"=>f.value, "type"=>f.feature_type, "name"=>f.name) for f in features]))
 end
 
 function api_search()
-    if !check_auth() return Genie.Renderer.Json.json(Dict("error" => "Unauthorized"), status=401) end
-    term = get(params(), :q, "")
-    results = find(GenomicFeature, SQLWhereExpression("name LIKE ?", "%$(term)%"))
-    return Genie.Renderer.Json.json([Dict("name" => r.name, "chrom" => r.chromosome, "pos" => r.position) for r in results])
+    !check_auth() && return json(Dict("error" => "Unauthorized"), status=401)
+    q = get(params(), :q, "")
+    results = find(GenomicFeature, SQLWhereExpression("name LIKE ?", "%" * q * "%"))
+    return json([Dict("name" => r.name, "chrom" => r.chromosome, "pos" => r.position) for r in results])
 end
 
+# --- FIXED EXPORT FUNCTION ---
 function export_csv()
     if !check_auth() return redirect(:login_page) end
+    
     chrom = get(params(), :chrom, "Chr1")
     features = find(GenomicFeature, SQLWhereExpression("chromosome = ?", chrom))
-    df = DataFrame(Name=[f.name for f in features], Chromosome=[f.chromosome for f in features], Position=[f.position for f in features], Type=[f.feature_type for f in features], Value=[f.value for f in features])
+    
+    df = DataFrame(
+        Name = [f.name for f in features],
+        Chromosome = [f.chromosome for f in features],
+        Position = [f.position for f in features],
+        Type = [f.feature_type for f in features],
+        Value = [f.value for f in features]
+    )
+    
     io = IOBuffer()
     CSV.write(io, df)
-    return Genie.Renderer.respond(String(take!(io)), headers = Dict("Content-Type" => "text/csv", "Content-Disposition" => "attachment; filename=\"genome_data.csv\""))
+    
+    # Using Raw HTTP Response to avoid Genie Renderer errors
+    return HTTP.Response(
+        200, 
+        ["Content-Type" => "text/csv", "Content-Disposition" => "attachment; filename=\"sugarcane_export.csv\""], 
+        String(take!(io))
+    )
 end
+
 end
