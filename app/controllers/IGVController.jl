@@ -24,7 +24,7 @@ function get_igv_html()
 
     <header class="bg-uq-purple text-white p-3 shadow-lg flex-none">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold">QAAFI Sugarcane <span class="text-sm font-normal opacity-75">(Hybrid JAQSUU)</span></h1>
+            <h1 class="text-xl font-bold">QAAFI Sugarcane <span class="text-sm font-normal opacity-75">(Sugarcance var R570 v2.1)</span></h1>
             <div class="flex items-center gap-4">
                  <a href="/dashboard" class="text-white hover:text-gray-200 font-bold text-sm">← Back to Dashboard</a>
                  <a href="/logout" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-xs font-bold">Sign Out</a>
