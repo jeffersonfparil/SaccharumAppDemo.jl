@@ -1,13 +1,19 @@
 using Genie.Router
-using .AuthController
-using .DashboardController
+using .App.AuthController
+using .App.DashboardController
+using .App.IGVController  # Ensure this is used
 
-route("/", AuthController.login_page, named=:login_page)
+# --- Authentication ---
+route("/", AuthController.login_page)
 route("/login", AuthController.login, method=POST)
 route("/logout", AuthController.logout)
 
-route("/dashboard", DashboardController.index, named=:dashboard)
-
+# --- Dashboard ---
+route("/dashboard", DashboardController.index)
 route("/api/data", DashboardController.api_genome_data)
 route("/api/search", DashboardController.api_search)
 route("/api/export_csv", DashboardController.export_csv)
+
+# --- IGV Browser (The Missing Link) ---
+route("/igv", IGVController.index)
+route("/api/igv/data.bed", IGVController.api_bed_data)

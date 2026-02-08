@@ -15,29 +15,45 @@ function get_dashboard_html()
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .uq-purple { background-color: #51247a; }
-        .loader { border-top-color: #51247a; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        
+        /* UQ PALETTE */
+        .bg-uq-purple  { background-color: #51247a; }
+        .text-uq-purple{ color: #51247a; }
+        .bg-uq-magenta { background-color: #962a8b; }
+        .bg-uq-green   { background-color: #2ea836; }
+        .bg-uq-orange  { background-color: #eb602b; }
+        .bg-uq-blue    { background-color: #4085c6; }
+        
+        .loader { border-top-color: #962a8b; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="bg-gray-50 flex flex-col h-screen">
 
-    <header class="uq-purple text-white p-3 shadow-lg flex-none">
+    <header class="bg-uq-purple text-white p-3 shadow-lg flex-none">
         <div class="container mx-auto flex justify-between items-center">
             <div class="flex items-center space-x-4">
                 <div class="border-r border-purple-400 pr-4">
-                    <h1 class="text-xl font-bold">QAAFI</h1>
-                    <p class="text-xs uppercase tracking-tighter text-purple-200">Centre for Crop Science</p>
+                    <h1 class="text-xl font-bold tracking-tight">QAAFI</h1>
+                    <p class="text-xs uppercase tracking-widest text-purple-200">Centre for Crop Science</p>
                 </div>
                 <h2 class="text-lg font-medium">Sugarcane Genetics Portal</h2>
             </div>
             <div class="flex items-center gap-4">
-                <div id="loading" class="hidden flex items-center gap-2 bg-white text-purple-800 px-3 py-1 rounded text-xs font-bold">
-                    <div class="loader ease-linear rounded-full border-2 border-t-2 border-gray-200 h-4 w-4"></div>
-                    Loading...
+                <div id="loading" class="hidden flex items-center gap-2 bg-white text-uq-magenta px-3 py-1 rounded text-xs font-bold shadow-sm">
+                    <div class="loader ease-linear rounded-full border-2 border-t-2 border-gray-100 h-4 w-4"></div>
+                    Processing...
                 </div>
-                <a href="/logout" class="bg-purple-600 hover:bg-red-600 px-4 py-2 rounded text-sm transition font-bold border border-purple-500">Sign Out</a>
+                
+                <a href="/igv" class="text-white hover:text-gray-200 font-bold text-sm mr-2 border-r border-purple-400 pr-4 flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    Genome Browser (IGV)
+                </a>
+
+                <a href="/logout" class="bg-uq-orange hover:bg-opacity-90 text-white px-4 py-2 rounded text-sm transition font-bold shadow-sm">
+                    Sign Out
+                </a>
             </div>
         </div>
     </header>
@@ -46,58 +62,63 @@ function get_dashboard_html()
         <div class="container mx-auto flex flex-wrap justify-between items-center gap-4">
             <div class="flex items-center space-x-4">
                 <div class="flex flex-col">
-                    <label class="text-xs font-bold text-gray-400 uppercase">Chromosome</label>
-                    <select id="chrom" onchange="load()" class="border-2 border-gray-200 rounded p-2 text-sm font-bold text-gray-700 focus:border-purple-500 outline-none">
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-wide">Chromosome</label>
+                    <select id="chrom" onchange="load()" class="border-2 border-gray-200 rounded p-2 text-sm font-bold text-gray-700 focus:border-uq-purple outline-none bg-gray-50">
                         <option value="Chr1">Chr1 (S. officinarum)</option>
                         <option value="Chr2">Chr2 (S. officinarum)</option>
                         <option value="Chr3">Chr3 (S. officinarum)</option>
                     </select>
                 </div>
-                <button onclick="load()" class="mt-4 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-bold shadow transition transform active:scale-95">
+                <button onclick="load()" class="mt-4 bg-uq-green hover:bg-opacity-90 text-white px-6 py-2 rounded font-bold shadow transition transform active:scale-95 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     Refresh Track
                 </button>
             </div>
             
             <div class="relative w-96">
-                <label class="text-xs font-bold text-gray-400 uppercase">Search Markers</label>
-                <input id="search" type="text" placeholder="e.g. SNP_100, GWAS..." class="w-full border-2 border-gray-200 rounded p-2 text-sm focus:border-purple-500 outline-none transition">
-                <div id="searchRes" class="absolute bg-white w-full shadow-2xl hidden z-50 border mt-1 max-h-64 overflow-y-auto rounded-b"></div>
+                <label class="text-xs font-bold text-gray-400 uppercase tracking-wide">Search Markers</label>
+                <input id="search" type="text" placeholder="e.g. SNP_100, GWAS..." class="w-full border-2 border-gray-200 rounded p-2 text-sm focus:border-uq-magenta outline-none transition text-gray-700">
+                <div id="searchRes" class="absolute bg-white w-full shadow-xl hidden z-50 border border-gray-100 mt-1 max-h-64 overflow-y-auto rounded-b"></div>
             </div>
             
-            <button onclick="dl()" class="mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 border px-4 py-2 rounded text-sm font-bold flex items-center gap-2">
-                <span>📥</span> Export CSV
+            <button onclick="dl()" class="mt-4 bg-uq-blue hover:bg-opacity-90 text-white px-4 py-2 rounded text-sm font-bold flex items-center gap-2 shadow-sm transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                Export CSV
             </button>
         </div>
     </div>
 
-    <main class="flex-grow p-4 overflow-hidden flex flex-col gap-4 relative">
+    <main class="flex-grow p-4 overflow-hidden flex flex-col gap-4 relative bg-gray-50">
         
-        <section class="bg-white rounded-xl shadow-sm border flex-grow h-1/2 relative p-2">
+        <section class="bg-white rounded-xl shadow-sm border border-gray-200 flex-grow h-1/2 relative p-2">
             <div id="plot" class="w-full h-full"></div>
-            <div id="empty-state" class="hidden absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10">
+            <div id="empty-state" class="hidden absolute inset-0 flex items-center justify-center bg-white bg-opacity-95 z-10 rounded-xl">
                 <div class="text-center">
-                    <h3 class="text-xl font-bold text-gray-400">No Data Found</h3>
-                    <p class="text-gray-400">Try selecting a different region or chromosome.</p>
+                    <div class="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-600">No Data Found</h3>
+                    <p class="text-sm text-gray-400">Try selecting a different region or chromosome.</p>
                 </div>
             </div>
         </section>
         
-        <section class="bg-white rounded-xl shadow-sm border flex-grow h-1/2 flex flex-col overflow-hidden">
-            <div class="p-3 border-b bg-gray-50 flex justify-between items-center flex-none">
-                <h3 class="font-bold text-gray-700 text-sm uppercase">Feature Table</h3>
-                <span id="count" class="text-xs font-mono bg-purple-100 text-purple-700 px-2 py-1 rounded">0 records</span>
+        <section class="bg-white rounded-xl shadow-sm border border-gray-200 flex-grow h-1/2 flex flex-col overflow-hidden">
+            <div class="p-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center flex-none rounded-t-xl">
+                <h3 class="font-bold text-uq-purple text-sm uppercase tracking-wide">Feature Table</h3>
+                <span id="count" class="text-xs font-bold bg-purple-50 text-uq-purple px-2 py-1 rounded border border-purple-100">0 records</span>
             </div>
             <div class="overflow-auto flex-grow">
                 <table class="w-full text-left border-collapse">
-                    <thead class="bg-gray-100 sticky top-0 text-xs uppercase text-gray-500 font-bold">
+                    <thead class="bg-gray-50 sticky top-0 text-xs uppercase text-gray-500 font-bold tracking-wider">
                         <tr>
-                            <th class="p-3 border-b">Name</th>
-                            <th class="p-3 border-b">Type</th>
-                            <th class="p-3 border-b">Position (bp)</th>
-                            <th class="p-3 border-b">Value (-log10 p)</th>
+                            <th class="p-3 border-b border-gray-200">Name</th>
+                            <th class="p-3 border-b border-gray-200">Type</th>
+                            <th class="p-3 border-b border-gray-200">Position (bp)</th>
+                            <th class="p-3 border-b border-gray-200">Value (0-1)</th>
                         </tr>
                     </thead>
-                    <tbody id="tbl" class="text-sm divide-y divide-gray-100"></tbody>
+                    <tbody id="tbl" class="text-sm divide-y divide-gray-50"></tbody>
                 </table>
             </div>
         </section>
@@ -130,8 +151,6 @@ function get_dashboard_html()
                 const json = await res.json();
                 currentData = json.features;
                 
-                console.log("Loaded " + currentData.length + " items");
-                
                 document.getElementById('count').innerText = currentData.length + ' records';
                 
                 if (currentData.length === 0) {
@@ -151,7 +170,13 @@ function get_dashboard_html()
 
         function draw(data, chrom) {
             const traces = {};
-            
+            const colors = {
+                'marker': '#51247a',  // Purple
+                'gene':   '#2ea836',  // Green
+                'gwas_peak': '#eb602b', // Orange
+                'default': '#4085c6'   // Blue
+            };
+
             data.forEach(d => {
                 if(!traces[d.type]) {
                     traces[d.type] = { 
@@ -159,7 +184,7 @@ function get_dashboard_html()
                         mode:'markers', 
                         name:d.type, 
                         type:'scatter',
-                        marker: { size: 8, opacity: 0.7 }
+                        marker: { size: 8, opacity: 0.8, color: colors[d.type] || colors['default'] }
                     };
                 }
                 traces[d.type].x.push(d.pos); 
@@ -169,8 +194,8 @@ function get_dashboard_html()
             
             const layout = { 
                 title: false,
-                xaxis: { title: 'Physical Position (bp)', gridcolor: '#f3f4f6' },
-                yaxis: { title: 'Signal Intensity', gridcolor: '#f3f4f6' },
+                xaxis: { title: 'Physical Position (bp)', gridcolor: '#f9fafb' },
+                yaxis: { title: 'Signal Intensity', range: [0, 1], fixedrange: true, gridcolor: '#f9fafb' },
                 margin: { t:20, b:40, l:60, r:20 },
                 hovermode: 'closest',
                 plot_bgcolor: 'white'
@@ -198,10 +223,10 @@ function get_dashboard_html()
             }
             el.innerHTML = data.slice(0, 100).map(d => {
                 return '<tr class="hover:bg-purple-50 transition border-b border-gray-50">' + 
-                       '<td class="p-3 font-mono font-bold text-purple-700">' + d.name + '</td>' +
-                       '<td class="p-3"><span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold uppercase">' + d.type + '</span></td>' +
-                       '<td class="p-3 text-gray-600">' + d.pos.toLocaleString() + '</td>' +
-                       '<td class="p-3 font-medium">' + d.val.toFixed(4) + '</td>' +
+                       '<td class="p-3 font-mono font-bold text-uq-purple">' + d.name + '</td>' +
+                       '<td class="p-3"><span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide">' + d.type + '</span></td>' +
+                       '<td class="p-3 text-gray-500">' + d.pos.toLocaleString() + '</td>' +
+                       '<td class="p-3 font-medium text-gray-800">' + d.val.toFixed(4) + '</td>' +
                        '</tr>';
             }).join('');
         }
@@ -221,7 +246,6 @@ function get_dashboard_html()
             
             debounceTimer = setTimeout(async () => {
                 try {
-                    console.log("Searching for: " + q);
                     const res = await fetch('/api/search?q=' + q);
                     const results = await res.json();
                     
@@ -229,8 +253,8 @@ function get_dashboard_html()
                          searchRes.innerHTML = '<div class="p-3 text-sm text-gray-400">No matches found</div>';
                     } else {
                         searchRes.innerHTML = results.slice(0, 15).map(d => 
-                            '<div class="p-3 hover:bg-purple-50 cursor-pointer text-sm border-b flex justify-between group" onclick="jump(\\'' + d.chrom + '\\',' + d.pos + ')">' + 
-                            '<span class="font-bold text-gray-800 group-hover:text-purple-700">' + d.name + '</span>' + 
+                            '<div class="p-3 hover:bg-purple-50 cursor-pointer text-sm border-b border-gray-50 flex justify-between group" onclick="jump(\\'' + d.chrom + '\\',' + d.pos + ')">' + 
+                            '<span class="font-bold text-gray-700 group-hover:text-uq-purple">' + d.name + '</span>' + 
                             '<span class="text-xs text-gray-400">' + d.chrom + ' : ' + d.pos + '</span>' +
                             '</div>'
                         ).join('');
@@ -289,13 +313,10 @@ end
 
 function api_genome_data()
     !check_auth() && return json(Dict("error" => "Unauthorized"), status=401)
-    
     chrom = get(params(), :chrom, "Chr1")
     s_pos = parse(Int, get(params(), :start, "0"))
     e_pos = parse(Int, get(params(), :end, "1000000000"))
-    
     features = find(GenomicFeature, SQLWhereExpression("chromosome = ? AND position >= ? AND position <= ?", chrom, s_pos, e_pos))
-    
     return json(Dict("features" => [Dict("id"=>f.id, "pos"=>f.position, "val"=>f.value, "type"=>f.feature_type, "name"=>f.name) for f in features]))
 end
 
@@ -306,13 +327,10 @@ function api_search()
     return json([Dict("name" => r.name, "chrom" => r.chromosome, "pos" => r.position) for r in results])
 end
 
-# --- FIXED EXPORT FUNCTION ---
 function export_csv()
     if !check_auth() return redirect(:login_page) end
-    
     chrom = get(params(), :chrom, "Chr1")
     features = find(GenomicFeature, SQLWhereExpression("chromosome = ?", chrom))
-    
     df = DataFrame(
         Name = [f.name for f in features],
         Chromosome = [f.chromosome for f in features],
@@ -320,16 +338,9 @@ function export_csv()
         Type = [f.feature_type for f in features],
         Value = [f.value for f in features]
     )
-    
     io = IOBuffer()
     CSV.write(io, df)
-    
-    # Using Raw HTTP Response to avoid Genie Renderer errors
-    return HTTP.Response(
-        200, 
-        ["Content-Type" => "text/csv", "Content-Disposition" => "attachment; filename=\"sugarcane_export.csv\""], 
-        String(take!(io))
-    )
+    return HTTP.Response(200, ["Content-Type" => "text/csv", "Content-Disposition" => "attachment; filename=\"sugarcane_export.csv\""], String(take!(io)))
 end
 
 end
