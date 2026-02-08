@@ -17,3 +17,7 @@ route("/api/export_csv", DashboardController.export_csv)
 # --- IGV Browser (The Missing Link) ---
 route("/igv", IGVController.index)
 route("/api/igv/data.bed", IGVController.api_bed_data)
+using .App.BrowsersController
+
+route("/jbrowse", BrowsersController.jbrowse)
+route("/gbrowse", BrowsersController.gbrowse)

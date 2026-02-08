@@ -17,14 +17,24 @@ function get_dashboard_html()
     <style>
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
         
-        /* UQ PALETTE */
+        /* UQ OFFICIAL PALETTE */
         .bg-uq-purple  { background-color: #51247a; }
         .text-uq-purple{ color: #51247a; }
-        .bg-uq-magenta { background-color: #962a8b; }
-        .bg-uq-green   { background-color: #2ea836; }
-        .bg-uq-orange  { background-color: #eb602b; }
-        .bg-uq-blue    { background-color: #4085c6; }
+        .border-uq-purple { border-color: #51247a; }
         
+        .bg-uq-magenta { background-color: #962a8b; }
+        .text-uq-magenta { color: #962a8b; }
+        
+        .bg-uq-green   { background-color: #2ea836; }
+        .text-uq-green { color: #2ea836; }
+        
+        .bg-uq-orange  { background-color: #eb602b; }
+        .text-uq-orange{ color: #eb602b; }
+        
+        .bg-uq-blue    { background-color: #4085c6; }
+        .text-uq-blue  { color: #4085c6; }
+
+        /* Loader Animation */
         .loader { border-top-color: #962a8b; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -38,18 +48,22 @@ function get_dashboard_html()
                     <h1 class="text-xl font-bold tracking-tight">QAAFI</h1>
                     <p class="text-xs uppercase tracking-widest text-purple-200">Centre for Crop Science</p>
                 </div>
-                <h2 class="text-lg font-medium">Sugarcane Genetics Portal</h2>
+                <h2 class="text-lg font-medium hidden md:block">Sugarcane Genetics Portal</h2>
             </div>
+            
             <div class="flex items-center gap-4">
                 <div id="loading" class="hidden flex items-center gap-2 bg-white text-uq-magenta px-3 py-1 rounded text-xs font-bold shadow-sm">
                     <div class="loader ease-linear rounded-full border-2 border-t-2 border-gray-100 h-4 w-4"></div>
                     Processing...
                 </div>
                 
-                <a href="/igv" class="text-white hover:text-gray-200 font-bold text-sm mr-2 border-r border-purple-400 pr-4 flex items-center gap-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                    Genome Browser (IGV)
-                </a>
+                <div class="flex space-x-3 text-sm font-bold border-r border-purple-400 pr-4 mr-2">
+                    <a href="/igv" class="text-white hover:text-gray-300 transition">IGV</a>
+                    <span class="text-purple-400">|</span>
+                    <a href="/jbrowse" class="text-white hover:text-gray-300 transition">JBrowse</a>
+                    <span class="text-purple-400">|</span>
+                    <a href="/gbrowse" class="text-gray-400 hover:text-white transition" title="Legacy Archive">GBrowse</a>
+                </div>
 
                 <a href="/logout" class="bg-uq-orange hover:bg-opacity-90 text-white px-4 py-2 rounded text-sm transition font-bold shadow-sm">
                     Sign Out
@@ -162,7 +176,6 @@ function get_dashboard_html()
                 
             } catch (err) { 
                 console.error(err);
-                alert("Error loading data. Check console.");
             } finally {
                 document.getElementById('loading').classList.add('hidden');
             }
@@ -285,8 +298,7 @@ function get_dashboard_html()
 """
 end
 
-# --- SESSION & API LOGIC ---
-
+# --- SESSION ---
 function get_session_token()
     if !haskey(Genie.Router.params(), :REQUEST) return nothing end
     req = Genie.Router.params(:REQUEST)
@@ -311,17 +323,30 @@ function index()
     check_auth() ? get_dashboard_html() : redirect(:login_page)
 end
 
+# --- ROBUST API ---
 function api_genome_data()
-    !check_auth() && return json(Dict("error" => "Unauthorized"), status=401)
+    if !check_auth() return json(Dict("error" => "Unauthorized"), status=401) end
+    
     chrom = get(params(), :chrom, "Chr1")
-    s_pos = parse(Int, get(params(), :start, "0"))
-    e_pos = parse(Int, get(params(), :end, "1000000000"))
+    s_input = get(params(), :start, "0")
+    e_input = get(params(), :end, "1000000000")
+    
+    println("🔍 API REQUEST: Chrom=$chrom, Start=$s_input, End=$e_input")
+    
+    # Safe Parsing
+    s_clean = first(split(s_input, "."))
+    e_clean = first(split(e_input, "."))
+    s_pos = isnothing(tryparse(Int, s_clean)) ? 0 : parse(Int, s_clean)
+    e_pos = isnothing(tryparse(Int, e_clean)) ? 1000000000 : parse(Int, e_clean)
+
     features = find(GenomicFeature, SQLWhereExpression("chromosome = ? AND position >= ? AND position <= ?", chrom, s_pos, e_pos))
+    println("✅ Found $(length(features)) features.")
+    
     return json(Dict("features" => [Dict("id"=>f.id, "pos"=>f.position, "val"=>f.value, "type"=>f.feature_type, "name"=>f.name) for f in features]))
 end
 
 function api_search()
-    !check_auth() && return json(Dict("error" => "Unauthorized"), status=401)
+    if !check_auth() return json(Dict("error" => "Unauthorized"), status=401) end
     q = get(params(), :q, "")
     results = find(GenomicFeature, SQLWhereExpression("name LIKE ?", "%" * q * "%"))
     return json([Dict("name" => r.name, "chrom" => r.chromosome, "pos" => r.position) for r in results])
@@ -331,16 +356,10 @@ function export_csv()
     if !check_auth() return redirect(:login_page) end
     chrom = get(params(), :chrom, "Chr1")
     features = find(GenomicFeature, SQLWhereExpression("chromosome = ?", chrom))
-    df = DataFrame(
-        Name = [f.name for f in features],
-        Chromosome = [f.chromosome for f in features],
-        Position = [f.position for f in features],
-        Type = [f.feature_type for f in features],
-        Value = [f.value for f in features]
-    )
+    df = DataFrame(Name=[f.name for f in features], Chromosome=[f.chromosome for f in features], Position=[f.position for f in features], Type=[f.feature_type for f in features], Value=[f.value for f in features])
     io = IOBuffer()
     CSV.write(io, df)
-    return HTTP.Response(200, ["Content-Type" => "text/csv", "Content-Disposition" => "attachment; filename=\"sugarcane_export.csv\""], String(take!(io)))
+    return HTTP.Response(200, ["Content-Type" => "text/csv", "Content-Disposition" => "attachment; filename=\"export.csv\""], String(take!(io)))
 end
 
 end

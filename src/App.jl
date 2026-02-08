@@ -35,7 +35,8 @@ include(joinpath("..", "app", "resources", "genomics", "Genomics.jl"))
 # Load Controllers
 include(joinpath("..", "app", "controllers", "AuthController.jl"))
 include(joinpath("..", "app", "controllers", "DashboardController.jl"))
-include(joinpath("..", "app", "controllers", "IGVController.jl")) # Critical Import
+include(joinpath("..", "app", "controllers", "IGVController.jl"))
+include(joinpath("..", "app", "controllers", "BrowsersController.jl")) # Added
 
 # Load Routes
 include(joinpath("..", "routes.jl"))
